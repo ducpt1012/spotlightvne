@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bản đồ Phường/Xã TP HCM mới</title>
+    <script src="./assets/js/tailwindcdn.js"></script>
+    <link rel="stylesheet" href="./assets/css/fontawesome.all.min.css" />
+    <link rel="stylesheet" href="./assets/css/leaflet.css" />
+    <script src="./assets/js/leaflet.js"></script>
+    <script src="./assets/js/topojson-client.min.js"></script>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+            z-index: 1;
+            background-color: #f9fafb;
+        }
+
+        /* --- Thanh tìm kiếm ở trên --- */
+        #top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1001;
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-start;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            pointer-events: none;
+        }
+
+        #logo-container {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            pointer-events: auto;
+        }
+
+        .topbar-logo {
+            height: 26px;
+            display: block;
+        }
+
+        @media (max-width: 640px) {
+            #top-bar {
+                padding: 0.5rem;
+            }
+            .topbar-logo {
+                height: 20px;
+            }
+        }
+
+        #search-container {
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+            pointer-events: auto;
+        }
+        @media (max-width: 640px) {
+            #search-container {
+                max-width: 85%;
+            }
+
+            #search-box {
+                padding: 0.4rem 0.4rem;
+                font-size: 0.7rem;
+            }
+
+            #wardSearchInput {
+                font-size: 0.7rem;
+            }
+        #logo-container {
+            margin-right: 0.5rem;
+        }
+        }
+
+        #search-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(8px);
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            padding: 0.5rem 1rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        #wardSearchInput {
+            width: 100%;
+            background: transparent;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #1f2937;
+            outline: none;
+            border: none;
+        }
+
+        #search-results {
+            display: none;
+            position: absolute;
+            top: 110%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-height: 40vh;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+        }
+
+        #search-results button.focused-search-result {
+            background-color: #e0e7ff;
+            outline: 2px solid #4f46e5;
+            outline-offset: -1px;
+        }
+
+        /* --- Thanh điều khiển ở dưới --- */
+        #bottom-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 799; /* Below Leaflet controls (z-index: 800) but above map panes */
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(8px);
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        #heatmap-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #heatmap-controls button {
+            padding: 0.6rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            background-color: #fff;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #4b5563;
+        }
+
+        #heatmap-controls button:hover {
+            background-color: #f3f4f6;
+        }
+
+        #heatmap-controls button.active {
+            background-color: #334155;
+            color: white;
+            border-color: #1e293b;
+        }
+
+        #legend-container {
+            flex-grow: 1;
+            max-width: 300px;
+            font-size: 12px;
+            visibility: hidden;
+        }
+
+        #legend-container .title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #1f2937;
+        }
+
+        #legend-bar-wrapper {
+            position: relative;
+            padding: 10px 0;
+        }
+
+        #legend-container .gradient {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        #legend-container .labels {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        #legend-indicator {
+            display: none;
+            position: absolute;
+            top: 5px;
+            height: 18px;
+            width: 2px;
+            background-color: #ef4444;
+            transform: translateX(-1px);
+            z-index: 10;
+        }
+
+        #legend-hover-value {
+            display: none;
+            position: absolute;
+            top: -13px;
+            transform: translateX(-50%);
+            background-color: #ef4444;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        /* --- Responsive cho di động --- */
+        @media (max-width: 768px) {
+            #bottom-bar {
+                flex-direction: column;
+                flex-direction: column-reverse;
+                gap: 0.5rem;
+                padding: 0.5rem;
+            }
+
+            #legend-container {
+                width: 100%;
+                max-width: none;
+                order: -1;
+            }
+
+            #top-bar {
+                padding: 0.75rem;
+            }
+
+            .info-popup .leaflet-popup-content {
+                margin: 0;
+                font-size: 13px;
+                max-width: 60vw;           /* Tối đa 60% chiều rộng màn hình lớn */
+                min-width: 200px;
+                padding-left: 1vw;         /* Tạo khoảng cách hai bên ~20% tổng */
+                padding-right: 1vw;
+                box-sizing: border-box;
+            }
+            @media (max-width: 768px) {
+                .info-popup .leaflet-popup-content {
+                    max-width: 90vw;
+                    padding-left: 1vw;
+                    padding-right: 1vw;
+                }
+            }
+        }
+
+        #legend-container .labels {
+            font-size: 10px;
+        }
+
+        /* --- Các style khác --- */
+        .spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            z-index: 2000;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .ward-label {
+            background-color: rgba(0, 0, 0, 0.6);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 5px 10px;
+            box-shadow: none;
+            white-space: nowrap;
+        }
+
+        .ward-label::before {
+            border: none !important;
+        }
+
+        .info-popup .leaflet-popup-content-wrapper {
+            border-radius: 0.5rem; /* Smaller border radius */
+            padding: 0;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-popup .leaflet-popup-content {
+            margin: 0;
+            font-size: 13px; /* Smaller base font size */
+        }
+
+        .info-popup-header {
+            background-color: #f9fafb;
+            padding: 0.6rem 1rem; /* Reduced padding */
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .info-popup-title {
+            font-size: 1rem; /* Smaller title font size (16px) */
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .info-popup-body {
+            padding: 0.75rem 1rem; /* Reduced padding */
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem; /* Reduced gap between items */
+        }
+
+        .info-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .info-label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem; /* Reduced gap for icon and label */
+            font-weight: 500;
+            color: #4b5563;
+        }
+
+        .info-label i {
+            color: #6b7280;
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .info-section {
+            border-top: 1px solid #f3f4f6;
+            padding-top: 0.6rem; /* Reduced top padding */
+            color: #4b5563;
+            line-height: 1.4; /* Tighter line height */
+        }
+
+        .info-popup-footer {
+            padding: 0.6rem; /* Reduced padding */
+            background-color: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .navigate-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            background-color: #4f46e5;
+            color: #ffffff !important;
+            font-weight: 500; /* Lighter font weight */
+            padding: 0.5rem; /* Reduced padding */
+            border-radius: 0.5rem;
+            text-decoration: none;
+            transition: background-color 0.2s;
+            font-size: 0.9em; /* Smaller font size for button text */
+        }
+
+        .navigate-btn:hover {
+            background-color: #4338ca;
+            color: #ffffff !important
+        }
+
+        /* --- NEW CSS TO REMOVE POPUP OVERLAY --- */
+        .leaflet-popup-overlay {
+            background: rgba(0,0,0,0); /* Fully transparent */
+            pointer-events: none;      /* Allows clicks to go through to the map */
+        }
+
+        /* --- Logo Control --- */
+        .leaflet-logo-control {
+            position: relative; /* Ensure z-index applies */
+            z-index: 1000;     /* Place it above other UI elements */
+            background-color: rgba(255, 255, 255, 0);
+            padding: 0.3rem;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+        }
+        .leaflet-logo-control img {
+            height: 22px;
+            width: auto;
+            display: block;
+        }
+        .medium-insert-embeds {
+        max-width: 800px;
+        margin: 20px auto; /* 20px adds space above/below, auto centers it left-to-right */
+        }
+        .video {
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        padding-top: 75%; /* 4:3 Aspect Ratio - good for this map */
+        }
+        .video iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        }
+        .info-metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem 0.6rem;
+        margin-bottom: 0.5rem;
+        margin-top: 0.2rem;
+        }
+        .metric-cell {
+        background: #f1f5f9;
+        border-radius: 8px;
+        padding: 0.25rem 0.35rem 0.3rem 0.35rem;
+        text-align: center;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        }
+        .metric-label {
+        font-size: 0.74em;
+        color: #64748b;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        margin-bottom: 0;
+        white-space: nowrap;
+        text-align: center;
+        }
+        .metric-rank {
+        font-size: 1.02em;
+        color: #4338ca;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        margin-bottom: 0;
+        line-height: 1.1;
+        }
+        .metric-value {
+        font-size: 0.7em;
+        font-weight: 400;
+        color: #111827;
+        margin-top: 0;
+        text-align: center;
+        line-height: 1.18;
+        word-break: break-word;
+        }
+        @media (max-width: 600px) {
+        .info-metrics-grid {
+            gap: 0.33rem 0.33rem;
+        }
+        .metric-cell {
+            padding: 0.18rem 0.1rem 0.22rem 0.1rem;
+            font-size: 0.91em;
+        }
+        .metric-label, .metric-rank, .metric-value {
+            font-size: 0.98em;
+        }
+        .info-popup-header{
+            padding:0.35rem 0.6rem !important;
+        }
+        .info-popup-body{
+            padding:0.4rem 0.6rem !important;
+            gap:0.4rem !important;
+        }
+        .info-popup-footer{
+            padding:0.4rem !important;
+        }
+        .navigate-btn{
+            padding:0.35rem !important;
+            font-size:0.8rem !important;
+        }
+        .info-line{
+            gap:0.25rem !important;
+            font-size:0.8rem !important;
+        }
+        /* Make Leaflet popup X button bigger and more visible */
+        .leaflet-popup-close-button {
+            font-size: 2.1rem !important;   /* Bigger X */
+            line-height: 2.0rem !important;
+            width: 2.2rem !important;
+            height: 2.2rem !important;
+            right: 0.5rem !important;
+            top: 0.2rem !important;
+            opacity: 0.88 !important;
+            color: #333 !important;
+            background: none !important;
+        }
+        .leaflet-popup-close-button:hover {
+            color: #ef4444 !important;
+            opacity: 1 !important;
+        }
+        }
+    </style>
+</head>
+
+</head>
+
+<body>
+
+    <div id="map"></div>
+    <div id="loading" class="spinner"></div>
+
+    <div id="top-bar">
+        <div id="logo-container">
+            <a href="https://vnexpress.net" target="_blank" title="Về trang chủ VnExpress">
+                <img src="./assets/images/qtsc_logo_transparent.png" alt="QTSC Logo" class="topbar-logo">
+            </a>
+        </div>
+        <div id="search-container">
+            <div id="search-box">
+                <input type="text" id="wardSearchInput" placeholder="Tìm ĐVHC (cũ/mới). VD: Phường 1 Quận 3, TP Bà Rịa, Bình Dương,...">
+            </div>
+            <div id="search-results"></div>
+        </div>
+    </div>
+
+    <div id="bottom-bar">
+        <div id="heatmap-controls">
+            <button id="btn-density" data-key="Mật độ (người/km2)">Mật độ</button>
+            <button id="btn-population" data-key="Dân số (người)">Dân số</button>
+            <button id="btn-area" data-key="Diện tích (km2)">Diện tích</button>
+        </div>
+        <div id="legend-container"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const WARDS_TOPOJSON_URL = './Data/Wards.json';
+            const PROVINCES_TOPOJSON_URL = './Data/Provinces.json';
+            const DISTRICTS_TOPOJSON_URL = './Data/Districts.json';
+            
+            // The TSV data URL is kept as-is for easy updating.
+            const WARD_DATA_TSV_URL = './Data/Data.tsv';
+
+            const LOCAL_TILE_URL = './assets/images/blank-tile.png';
+            const LOW_ZOOM_TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png';
+            const HIGH_ZOOM_TILE_URL = 'https://mt.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+
+            // --- Other Configurations ---
+            const START_COLOR = { r: 247, g: 251, b: 255 };
+            const END_COLOR = { r: 8, g: 48, b: 107 };
+            const NO_DATA_COLOR = '#cccccc';
+            const DEFAULT_WARD_STYLE = {
+                weight: 1,
+                color: '#0f0f0f',
+                opacity: 0.7,
+                fillColor: 'transparent',
+                fillOpacity: 0
+            };
+
+            // --- DOM ELEMENT REFERENCES ---
+            const loadingSpinner = document.getElementById('loading');
+            const searchInput = document.getElementById('wardSearchInput');
+            const searchResultsPanel = document.getElementById('search-results');
+            const heatmapControls = document.getElementById('heatmap-controls');
+            const legendContainer = document.getElementById('legend-container');
+            const searchContainer = document.getElementById('search-container');
+            const mapDomElement = document.getElementById('map');
+            const densityButton = document.getElementById('btn-density');
+
+            // --- APPLICATION STATE ---
+            let wardData, provinceData, districtData, currentTileLayer;
+            let map, wardsLayer, searchHighlightLayer;
+            let choroplethInfo = {};
+            let displayedSearchResults = [];
+            let currentFocusedResultIndex = -1;
+            let searchDebounceTimer;
+            let currentSelectedWardId = null;   // STT of the ward currently highlighted
+            let activeTooltipLayer = null;
+
+            // --- UTILITY FUNCTIONS ---
+            const setLoading = (isLoading) => {
+                loadingSpinner.style.display = isLoading ? 'block' : 'none';
+            };
+
+            const normalizeString = (() => {
+                return (str) => {
+                    if (!str) return '';
+                    let n = str.toLowerCase();
+                    n = n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+
+                    // Consistently map common prefixes/abbreviations to their full normalized form
+                    n = n.replace(/\bthành phố\b/g, "thanh pho");
+                    n = n.replace(/\btp\b/g, "thanh pho"); // Handle "tp" as a word
+                    n = n.replace(/tp\./g, "thanh pho"); // Handle "tp."
+                    n = n.replace(/\bphường\b/g, "phuong");
+                    n = n.replace(/\bp\./g, "phuong");
+                    n = n.replace(/\bquận\b/g, "quan");
+                    n = n.replace(/\bq\./g, "quan");
+                    n = n.replace(/\bhuyện\b/g, "huyen");
+                    n = n.replace(/\bh\./g, "huyen");
+                    return n.replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+                };
+            })();
+
+            const isAccurateMatch = (query, target) => {
+                if (!query || !target) return false;
+                const qLen = query.length;
+                const tLen = target.length;
+                return target === query ||
+                        target.startsWith(query) || // More lenient prefix matching
+                        (target.endsWith(query) && (tLen > qLen && target[tLen - qLen - 1] === ' ')) ||
+                        ` ${target} `.includes(` ${query} `);
+            };
+            
+            const formatWardList = (wardString) => {
+                if (!wardString?.trim()) return '';
+                const wards = wardString.split(',').map(w => w.trim()).filter(Boolean);
+                const groupedByDistrict = {};
+                wards.forEach(ward => {
+                    const match = ward.match(/(.+?)\s*\((.+?)\)/);
+                    if (match) {
+                        const [, name, district] = match;
+                        const districtKey = `(${district.trim()})`;
+                        if (!groupedByDistrict[districtKey]) groupedByDistrict[districtKey] = [];
+                        groupedByDistrict[districtKey].push(name.trim());
+                    } else {
+                        if (!groupedByDistrict['Khác']) groupedByDistrict['Khác'] = [];
+                        groupedByDistrict['Khác'].push(ward);
+                    }
+                });
+                return Object.entries(groupedByDistrict).map(([district, names]) => {
+                    if (district === 'Khác') return names.join(', ');
+                    const prefix = names.every(n => n.startsWith('Phường ')) ? 'Phường' : (names.every(n => n.startsWith('Xã ')) ? 'Xã' : '');
+                    if (prefix) {
+                        return `${prefix} ${names.map(n => n.replace(prefix, '').trim()).join(', ')} ${district}`;
+                    }
+                    return `${names.join(', ')} ${district}`;
+                }).join('; ');
+            };
+
+            // --- MAP VISUALIZATION ---
+            const interpolateColor = (color1, color2, factor) => {
+                const r = Math.round(color1.r + factor * (color2.r - color1.r));
+                const g = Math.round(color1.g + factor * (color2.g - color1.g));
+                const b = Math.round(color1.b + factor * (color2.b - color1.b));
+                return `rgb(${r},${g},${b})`;
+            };
+
+            const getChoroplethColor = (value, key) => {
+                const info = choroplethInfo[key];
+                if (!info || typeof value !== 'number' || !isFinite(value)) return NO_DATA_COLOR;
+                if (info.numBins <= 1) return interpolateColor(START_COLOR, END_COLOR, 0.5);
+                const breaks = info.breaks;
+                let binIndex = breaks.findIndex(b => value <= b);
+                if (binIndex === -1) binIndex = breaks.length;
+                const factor = binIndex / (info.numBins - 1);
+                return interpolateColor(START_COLOR, END_COLOR, factor);
+            };
+
+            const updateLegend = (title, min, max) => {
+                const show = title && typeof min === 'number' && typeof max === 'number';
+                legendContainer.style.visibility = show ? 'visible' : 'hidden';
+                if (!show) return;
+
+                const unitStartIndex = title.indexOf('(');
+                const unit = unitStartIndex !== -1 ? title.substring(unitStartIndex) : '';
+                const minLabel = Math.round(min).toLocaleString('vi-VN');
+                const maxLabel = Math.round(max).toLocaleString('vi-VN');
+                const gradientCss = `linear-gradient(to right, rgb(${START_COLOR.r},${START_COLOR.g},${START_COLOR.b}), rgb(${END_COLOR.r},${END_COLOR.g},${END_COLOR.b}))`;
+
+                legendContainer.innerHTML = `
+                    <div id="legend-bar-wrapper">
+                        <div class="gradient" style="background: ${gradientCss};"></div>
+                        <div id="legend-indicator"></div>
+                        <div id="legend-hover-value"></div>
+                    </div>
+                    <div class="labels">
+                        <span>${minLabel}</span>
+                        <span>${maxLabel} ${unit}</span>
+                    </div>`;
+            };
+            let renderMapVisualization = () => { // Changed const to let
+                const activeBtn = heatmapControls.querySelector('button.active');
+                if (!wardsLayer) return;
+
+                if (activeBtn?.dataset.key) {
+                    const categoryKey = activeBtn.dataset.key;
+                    const info = choroplethInfo[categoryKey];
+                    if (!info) {
+                        wardsLayer.setStyle(DEFAULT_WARD_STYLE);
+                        updateLegend(null);
+                        return;
+                    }
+                    wardsLayer.setStyle(feature => ({
+                        fillColor: getChoroplethColor(feature.properties[categoryKey], categoryKey),
+                        weight: 0.5,
+                        opacity: 1,
+                        color: '#0f0f0f',
+                        fillOpacity: 0.8
+                    }));
+                    updateLegend(categoryKey, info.min, info.max);
+                } else {
+                    wardsLayer.setStyle(DEFAULT_WARD_STYLE);
+                    updateLegend(null);
+                }
+            };
+            
+            // --- DATA HANDLING ---
+            const parseTSV = (tsvText) => {
+                const lines = tsvText.trim().split(/\r?\n/);
+                const headers = lines[0].split('\t').map(h => h.trim());
+                return lines.slice(1).map(line => {
+                    const values = line.split('\t');
+                    const rowObject = {};
+                    headers.forEach((header, i) => {
+                        const value = values[i] || '';
+                        // Keep 'Loại' as a string, parse others as numbers if possible
+                        if (header === 'Loại') {
+                             rowObject[header] = value.trim();
+                        } else {
+                             rowObject[header] = isNaN(parseFloat(value)) ? value.trim() : parseFloat(value);
+                        }
+                    });
+                    return rowObject;
+                }).filter(obj => obj.STT);
+            };
+
+            const loadData = async () => {
+                try {
+                    const responses = await Promise.all([
+                        fetch(WARDS_TOPOJSON_URL),
+                        fetch(WARD_DATA_TSV_URL),
+                        fetch(PROVINCES_TOPOJSON_URL),
+                        fetch(DISTRICTS_TOPOJSON_URL)
+                    ]);
+
+                    if (responses.some(res => !res.ok)) throw new Error('Network response was not ok. Check file URLs.');
+
+                    const wardsTopo = await responses[0].json();
+                    const tsvText = await responses[1].text();
+                    const provincesTopo = await responses[2].json();
+                    const districtsTopo = await responses[3].json();
+
+                    // Convert TopoJSON to GeoJSON. This code gets the first object key automatically.
+                    const parsedGeojsonData = topojson.feature(wardsTopo, Object.keys(wardsTopo.objects)[0]);
+                    provinceData = topojson.feature(provincesTopo, Object.keys(provincesTopo.objects)[0]);
+                    districtData = topojson.feature(districtsTopo, Object.keys(districtsTopo.objects)[0]);
+
+                    // The original TSV parsing and merging logic is kept as requested.
+                    const tsvData = parseTSV(tsvText);
+                    const dataMap = new Map(tsvData.map(row => [row.STT, row]));
+                    parsedGeojsonData.features.forEach(f => Object.assign(f.properties, dataMap.get(f.properties.STT)));
+                    wardData = parsedGeojsonData;
+
+                    prepareChoroplethData();
+                } catch (error) {
+                    setLoading(false);
+                    alert(`Lỗi tải dữ liệu: ${error.message}`);
+                    throw error;
+                }
+            };
+
+            const prepareChoroplethData = () => {
+                const keys = ['Mật độ (người/km2)', 'Dân số (người)', 'Diện tích (km2)'];
+                const NUM_QUANTILES = 10;
+                keys.forEach(key => {
+                    const values = wardData.features
+                        .map(f => f.properties[key])
+                        .filter(v => typeof v === 'number' && isFinite(v))
+                        .sort((a, b) => a - b);
+                    if (values.length === 0) {
+                        choroplethInfo[key] = { min: 0, max: 0, breaks: [], numBins: 0 };
+                        return;
+                    }
+                    const uniqueSortedValues = [...new Set(values)];
+                    const minVal = values[0];
+                    const maxVal = values[values.length - 1];
+                    let breaks = [];
+                    if (uniqueSortedValues.length < NUM_QUANTILES) {
+                        breaks = uniqueSortedValues.slice(0, -1);
+                    } else {
+                        for (let i = 1; i < NUM_QUANTILES; i++) {
+                            const index = Math.ceil(values.length * i / NUM_QUANTILES) - 1;
+                            const potentialBreak = values[Math.min(index, values.length - 1)];
+                            if (breaks.length === 0 || potentialBreak > breaks[breaks.length - 1]) {
+                                breaks.push(potentialBreak);
+                            }
+                        }
+                    }
+                    if (breaks.length > 0 && breaks[breaks.length - 1] < maxVal) {
+                        breaks.push(maxVal);
+                    }
+                    breaks = [...new Set(breaks)].sort((a, b) => a - b);
+                    choroplethInfo[key] = { min: minVal, max: maxVal, breaks, numBins: breaks.length + 1 };
+                });
+            };
+
+            // Sau prepareChoroplethData()
+            const addRankings = () => {
+                if (!wardData?.features) return;
+
+                const metrics = [
+                    { key: 'Dân số (người)',      rankKey: 'rank_population' },
+                    { key: 'Diện tích (km2)',     rankKey: 'rank_area' },
+                    { key: 'Mật độ (người/km2)',  rankKey: 'rank_density' }
+                ];
+
+                metrics.forEach(({ key, rankKey }) => {
+                    // Sắp xếp giảm dần → lớn nhất hạng 1
+                    const sorted = wardData.features
+                        .filter(f => typeof f.properties[key] === 'number' && isFinite(f.properties[key]))
+                        .sort((a, b) => b.properties[key] - a.properties[key]);
+
+                    sorted.forEach((f, idx) => { f.properties[rankKey] = idx + 1; });
+                });
+            };
+
+            // --- EVENT HANDLERS & POPUPS ---
+            const onWardMouseover = (e) => {
+                if (activeTooltipLayer && activeTooltipLayer !== e.target) {
+                    activeTooltipLayer.closeTooltip();
+                }
+                e.target.openTooltip();
+                activeTooltipLayer = e.target;
+                const activeBtn = heatmapControls.querySelector('button.active');
+                if (!activeBtn?.dataset.key) return;
+                const key = activeBtn.dataset.key;
+                const value = e.target.feature.properties[key];
+                const info = choroplethInfo[key];
+                const indicator = document.getElementById('legend-indicator');
+                const hoverValue = document.getElementById('legend-hover-value');
+                if (!indicator || typeof value !== 'number' || !info || info.max <= info.min) return;
+                const percent = (value - info.min) / (info.max - info.min) * 100;
+                indicator.style.left = `${percent}%`;
+                indicator.style.display = 'block';
+                hoverValue.innerText = Math.round(value).toLocaleString('vi-VN');
+                hoverValue.style.left = `${percent}%`;
+                hoverValue.style.display = 'block';
+            };
+
+            const onWardMouseout = (e) => {
+                const indicator = document.getElementById('legend-indicator');
+                const hoverValue = document.getElementById('legend-hover-value');
+                if (indicator) indicator.style.display = 'none';
+                if (hoverValue) hoverValue.style.display = 'none';
+                if (e?.target?.closeTooltip) e.target.closeTooltip();
+                if (activeTooltipLayer === e.target) {
+                    activeTooltipLayer = null;
+                }
+            };
+            
+            const onEachFeatureForWardLayer = (feature, layer) => {
+                const { 'Tên': name = 'N/A', 'Loại': type } = feature.properties;
+                // Use the 'Loại' property if it exists, otherwise fall back to checking the name.
+                const finalType = type || (/xã/i.test(name) ? 'Xã' : 'Phường');
+                // Only bind a non-permanent tooltip (for mouseover/out)
+                layer.bindTooltip(`${finalType} ${name}`);
+
+                layer.on({
+                    mouseover: onWardMouseover,
+                    mouseout: onWardMouseout,
+                    click: (e) => {
+                        L.DomEvent.stopPropagation(e);
+
+                        // If tapping the same ward again, deselect & quit
+                        if (currentSelectedWardId === feature.properties.STT) {
+                            map.closePopup();
+                            showResultOnMap(null);
+                            currentSelectedWardId = null;
+                            searchInput.value = '';
+                            searchResultsPanel.style.display = 'none';
+                            updateFocusedSearchResult(-1);
+                            return;
+                        }
+
+                        // Otherwise, reset any previous selection
+                        map.closePopup();
+                        showResultOnMap(null);
+                        currentSelectedWardId = feature.properties.STT;
+
+                        showResultOnMap(feature, 'ward', false); // Highlight on main map
+
+                        const topBarElement = document.getElementById('top-bar');
+                        const bottomBarElement = document.getElementById('bottom-bar');
+                        const topBarHeight = topBarElement ? topBarElement.offsetHeight : 75;
+                        const bottomBarHeight = bottomBarElement ? bottomBarElement.offsetHeight : 120;
+                        const horizontalPopupMarginFromEdge = 20;
+                        const verticalPopupMarginFromBar = 15;
+                        const popupActualPaddingTop = topBarHeight + verticalPopupMarginFromBar;
+                        const popupActualPaddingBottom = bottomBarHeight + verticalPopupMarginFromBar;
+
+                        L.popup({ className: 'info-popup', autoPanPaddingTopLeft: L.point(horizontalPopupMarginFromEdge, popupActualPaddingTop), autoPanPaddingBottomRight: L.point(horizontalPopupMarginFromEdge, popupActualPaddingBottom)})
+                            .setLatLng(e.latlng)
+                            .setContent(createPopupContent(feature.properties))
+                            .openOn(map); // targetMapInstance is map here
+                    }
+                });
+            };
+
+            const createPopupContent = (props) => {
+                const name = props?.['Tên'] ?? 'N/A';
+                // Use the 'Loại' property. Fallback to old logic if 'Loại' is missing.
+                const type = props?.['Loại'] || (/xã/i.test(name) ? 'Xã' : 'Phường');
+                const populationValue = props?.['Dân số (người)'];
+                const areaValue = props?.['Diện tích (km2)'];
+                const densityValue = props?.['Mật độ (người/km2)'];
+
+                const populationRank = props?.['rank_population'];
+                const areaRank = props?.['rank_area'];
+                const densityRank = props?.['rank_density'];
+
+                const population = populationValue ? populationValue.toLocaleString('vi-VN') : 'N/A';
+                const area = areaValue ? `${areaValue.toFixed(2)} km²` : 'N/A';
+                const density = densityValue ? `${Math.round(densityValue).toLocaleString('vi-VN')} ng/km²` : 'N/A';
+
+                const mergedAllText = formatWardList(props['Sáp nhập toàn bộ từ']);
+                const mergedPartialText = formatWardList(props['Sáp nhập một phần từ']);
+                let mergedWardsText = 'Không';
+                if (mergedAllText || mergedPartialText) {
+                    mergedWardsText = [
+                        mergedAllText ? `Toàn bộ ${mergedAllText}` : '',
+                        mergedPartialText ? `Một phần ${mergedPartialText}` : ''
+                    ].filter(Boolean).join('; và ');
+                }
+                const headquarters = props?.['Full Address 1'] ?? 'Chưa có thông tin';
+                const hotlineRaw = props?.['SĐT'] ?? null;
+                const hotline = typeof hotlineRaw === 'number' ? '0' + hotlineRaw.toString() : hotlineRaw;
+                const lat = props?.['Latitude 1'];
+                const lon = props?.['Longitude 1'];
+                const navUrl = (lat && lon) ? `https://maps.google.com/maps?q=${lat},${lon}` : null;
+                return `
+                    <div class="info-popup-header"><div class="info-popup-title">${type} ${name}</div></div>
+                    <div class="info-popup-body">
+                    <div class="info-metrics-grid">
+                    <div class="metric-cell">
+                        <div class="metric-label">Dân số</div>
+                        <div class="metric-rank">${populationRank ? `<span class="text-indigo-700 font-semibold">#${populationRank}/168</span>` : ''}</div>
+                        <div class="metric-value">${population} người</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-label">Diện tích</div>
+                        <div class="metric-rank">${areaRank ? `<span class="text-indigo-700 font-semibold">#${areaRank}/168</span>` : ''}</div>
+                        <div class="metric-value">${area}</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-label">Mật độ</div>
+                        <div class="metric-rank">${densityRank ? `<span class="text-indigo-700 font-semibold">#${densityRank}/168</span>` : ''}</div>
+                        <div class="metric-value">${density}</div>
+                    </div>
+                    </div>
+                        <div class="info-section"><div class="info-label"><i class="fa-solid fa-code-merge fa-fw"></i><span>Sáp nhập</span></div>${mergedWardsText}</div>
+                        <div class="info-section"><div class="info-label"><i class="fa-solid fa-location-dot fa-fw"></i><span>Trụ sở</span></div>${headquarters}</div>
+                        ${hotline ? `<div class="info-section"><div class="info-label"><i class="fa-solid fa-phone fa-fw"></i><span>Đường dây nóng</span></div>${hotline}</div>` : ''}
+                    </div>
+                    ${navUrl ? `<div class="info-popup-footer"><a href="${navUrl}" target="_blank" class="navigate-btn"><i class="fa-solid fa-diamond-turn-right fa-fw"></i> Chỉ đường đến trụ sở</a></div>` : ''}
+                `;
+            };
+
+            // --- SEARCH FUNCTIONALITY ---
+            const getAdminMatches = (normalizedQuery) => {
+                const matches = [];
+                const sources = [{ data: provinceData, type: 'province' }, { data: districtData, type: 'district' }];
+                for (const source of sources) {
+                    if (!source.data || !source.data.features) continue;
+                    for (const feature of source.data.features) {
+                        const adminName = feature.properties.name || '';
+                        const normalizedAdminName = normalizeString(adminName);
+                        if (isAccurateMatch(normalizedQuery, normalizedAdminName)) {
+                            matches.push({ feature, type: source.type, displayName: adminName, normalizedDisplayName: normalizedAdminName, priority: source.type === 'province' ? 0 : 1 });
+                        }
+                    }
+                }
+                return matches;
+            };
+
+            const getWardMatches = (normalizedQuery) => {
+                const matches = [];
+                if (!wardData || !wardData.features) return matches;
+                wardData.features.forEach(feature => {
+                    const props = feature.properties;
+                    const newName = props['Tên'] || '';
+                    const normalizedNewName = normalizeString(newName);
+                    const oldWardsAll = (props['Sáp nhập toàn bộ từ'] || '').split(',').map(w => w.trim()).filter(Boolean);
+                    const oldWardsPartial = (props['Sáp nhập một phần từ'] || '').split(',').map(w => w.trim()).filter(Boolean);
+                    const allOldWards = [...oldWardsAll, ...oldWardsPartial];
+                    let matchedOldWardDirect = null;
+                    for (const ow of allOldWards) {
+                        if (isAccurateMatch(normalizedQuery, normalizeString(ow))) { matchedOldWardDirect = ow; break; }
+                    }
+                    const matchedViaNewName = isAccurateMatch(normalizedQuery, normalizedNewName);
+                    if (matchedViaNewName || matchedOldWardDirect) {
+                        matches.push({ feature, type: 'ward', displayName: newName, matchedOldWardDirect, matchedViaNewName, priority: matchedOldWardDirect ? 2 : 3 });
+                    }
+                });
+                return matches;
+            };
+            
+            const handleNameSearch = () => {
+                currentFocusedResultIndex = -1;
+                const query = searchInput.value;
+                if (query.trim().length < 2) {
+                    searchResultsPanel.style.display = 'none';
+                    showResultOnMap(null);
+                    return;
+                }
+                const normalizedQuery = normalizeString(query);
+                const adminMatches = getAdminMatches(normalizedQuery);
+                const wardMatches = getWardMatches(normalizedQuery);
+                const hasExactAdminMatch = adminMatches.some(m => m.normalizedDisplayName === normalizedQuery);
+                if (hasExactAdminMatch) {
+                    displayedSearchResults = adminMatches.filter(m => m.normalizedDisplayName === normalizedQuery);
+                } else {
+                    displayedSearchResults = [...adminMatches, ...wardMatches];
+                }
+                displayedSearchResults.sort((a, b) => {
+                    if (a.priority !== b.priority) return a.priority - b.priority;
+                    return normalizeString(a.displayName).localeCompare(normalizeString(b.displayName));
+                });
+                renderSearchResults();
+            };
+            
+            const renderSearchResults = () => {
+                if (searchHighlightLayer) { map.removeLayer(searchHighlightLayer); searchHighlightLayer = null; }
+                if (displayedSearchResults.length === 0) {
+                    searchResultsPanel.innerHTML = `<p class="p-4 text-center text-gray-500">Không tìm thấy kết quả.</p>`;
+                } else {
+                    const listHtml = displayedSearchResults.map((item, index) => {
+                        let displayHtml, typeText, typeColor;
+                        if (item.type === 'ward') {
+                            typeText = 'Phường/Xã mới'; typeColor = 'text-indigo-500';
+                            displayHtml = `<span class="font-semibold">${item.displayName}</span>`;
+                            displayHtml += `<span class="text-xs ${typeColor} block font-medium">${typeText}</span>`;
+                            if (item.matchedOldWardDirect) {
+                                if (item.matchedOldWardDirect.includes('(giữ nguyên)')) {
+                                    displayHtml += `<span class="text-xs text-gray-500 block">Giữ nguyên tên</span>`;
+                                } else {
+                                    displayHtml += `<span class="text-xs text-gray-500 block">Sáp nhập từ ${item.matchedOldWardDirect}</span>`;
+                                }
+                            }
+                        } else {
+                            typeText = item.type === 'district' ? 'Quận/Huyện' : 'Tỉnh/Thành phố';
+                            typeColor = item.type === 'district' ? 'text-teal-600' : 'text-purple-600';
+                            displayHtml = `<span class="font-semibold">${item.displayName}</span><span class="text-xs ${typeColor} block font-medium">${typeText}</span>`;
+                        }
+                        return `<li><button id="search-result-item-${index}" onclick="window.handleSearchResultClick(${index})" class="w-full text-left p-3 hover:bg-indigo-50 rounded-lg text-gray-700 focus:outline-none">${displayHtml}</button></li>`;
+                    }).join('');
+                    searchResultsPanel.innerHTML = `<ul class="space-y-1 p-2">${listHtml}</ul>`;
+                }
+                searchResultsPanel.style.display = 'block';
+            };
+            
+            window.handleSearchResultClick = (index) => {
+                if (index < 0 || index >= displayedSearchResults.length) return;
+                const item = displayedSearchResults[index];
+                if (item?.feature) {
+                    showResultOnMap(item.feature, item.type, true);
+                    searchResultsPanel.style.display = 'none';
+                    searchInput.value = item.displayName;
+                }
+            };
+            
+            const showResultOnMap = (feature, featureType = 'ward', shouldZoom = true) => {
+                if (searchHighlightLayer) map.removeLayer(searchHighlightLayer);
+                searchHighlightLayer = null;
+                if (!feature) return;
+
+                let style, tooltipText;
+                const props = feature.properties;
+                switch (featureType) {
+                    case 'province':
+                        style = { color: '#800080', weight: 3, opacity: 1, fillOpacity: 0.25, fillColor: '#800080' };
+                        tooltipText = `Tỉnh/TP: ${props.name || 'N/A'}`;
+                        break;
+                    case 'district':
+                        style = { color: '#008080', weight: 3, opacity: 1, fillOpacity: 0.3, fillColor: '#008080' };
+                        tooltipText = `Quận/Huyện: ${props.name || 'N/A'}`;
+                        break;
+                    default:
+                        style = { color: '#fde047', weight: 4, opacity: 1, fillColor: '#facc15', fillOpacity: 0.5 };
+                        const wardName = props['Tên'] || 'N/A';
+                        // Use 'Loại' property. Fallback to old logic if 'Loại' is missing.
+                        const type = props['Loại'] || (/xã/i.test(wardName) ? 'Xã' : 'Phường');
+                        tooltipText = `${type} ${wardName}`;
+                }
+                
+                searchHighlightLayer = L.geoJSON(feature, { style, interactive: false }).addTo(map);
+
+                // Do NOT add a permanent tooltip to the highlighted search result
+                // if (tooltipText) {
+                //    searchHighlightLayer.bindTooltip(tooltipText, { permanent: true, direction: 'center', className: 'ward-label' }).openTooltip();
+                // }
+
+                if (shouldZoom) {
+                    const bottomBarElement = document.getElementById('bottom-bar');
+                    const horizontalFlyToPadding = 20;
+                    const verticalFlyToPaddingFromBar = 20;
+                    const flyToActualPaddingTop = 80;
+                    const flyToActualPaddingBottom = (bottomBarElement ? bottomBarElement.offsetHeight : 120) + verticalFlyToPaddingFromBar;
+                    map.flyToBounds(searchHighlightLayer.getBounds(), {
+                        paddingTopLeft: L.point(horizontalFlyToPadding, flyToActualPaddingTop),
+                        paddingBottomRight: L.point(horizontalFlyToPadding, flyToActualPaddingBottom)
+                    });
+                }
+            };
+            
+            const updateFocusedSearchResult = (newIndex) => {
+                if (searchResultsPanel.style.display === 'none' || displayedSearchResults.length === 0) return;
+                if (currentFocusedResultIndex !== -1) { document.getElementById(`search-result-item-${currentFocusedResultIndex}`)?.classList.remove('focused-search-result'); }
+                currentFocusedResultIndex = newIndex;
+                if (currentFocusedResultIndex !== -1) {
+                    const newFocusedItem = document.getElementById(`search-result-item-${currentFocusedResultIndex}`);
+                    if (newFocusedItem) { newFocusedItem.classList.add('focused-search-result'); newFocusedItem.scrollIntoView({ block: 'nearest' }); }
+                }
+            };
+
+            // --- MAP INITIALIZATION & LAYERS ---
+            const createWardsLayer = () => {
+                wardsLayer = L.geoJSON(wardData, {
+                    style: DEFAULT_WARD_STYLE,
+                    onEachFeature: (feature, layer) => {
+                        onEachFeatureForWardLayer(feature, layer);
+                    }
+                }).addTo(map);
+            };
+
+            const ensureVectorLayersOnTop = () => {
+                if (wardsLayer) wardsLayer.bringToFront();
+                if (searchHighlightLayer) searchHighlightLayer.bringToFront();
+            };
+
+            const createTileLayer = (url) => {
+                const options = { maxZoom: 20 };
+                if (url === LOW_ZOOM_TILE_URL) {
+                    options.attribution = '© OpenStreetMap contributors © CARTO';
+                    options.subdomains = 'abcd';
+                } else if (url === HIGH_ZOOM_TILE_URL) {
+                    options.attribution = 'Map data © Google';
+                }
+                return L.tileLayer(url, options);
+            };
+
+            const handleTileError = () => {
+                if (!currentTileLayer || currentTileLayer._url === LOCAL_TILE_URL) return;
+                currentTileLayer.setUrl(LOCAL_TILE_URL);
+                ensureVectorLayersOnTop();
+            };
+
+            const applyTileLayer = (url) => {
+                if (currentTileLayer && currentTileLayer._url === url) return;
+                if (currentTileLayer) {
+                    currentTileLayer.off('tileerror', handleTileError);
+                    map.removeLayer(currentTileLayer);
+                }
+                currentTileLayer = createTileLayer(url).addTo(map);
+                currentTileLayer.on('tileerror', handleTileError);
+                ensureVectorLayersOnTop();
+            };
+
+            const resolveTileUrl = () => {
+                if (!navigator.onLine) return LOCAL_TILE_URL;
+                const zoom = map ? map.getZoom() : 9;
+                return zoom <= 11 ? LOW_ZOOM_TILE_URL : HIGH_ZOOM_TILE_URL;
+            };
+
+            const updateTileLayer = () => {
+                if (!map) return;
+                applyTileLayer(resolveTileUrl());
+            };
+
+            const originalRenderMapVisualization = renderMapVisualization; // Keep a reference if needed or integrate directly
+            renderMapVisualization = () => { // Override or redefine
+                const activeBtn = heatmapControls.querySelector('button.active');
+                const styleForFeature = feature => {
+                    if (activeBtn?.dataset.key) {
+                        const categoryKey = activeBtn.dataset.key;
+                        return { fillColor: getChoroplethColor(feature.properties[categoryKey], categoryKey), weight: 0.5, opacity: 1, color: '#0f0f0f', fillOpacity: 0.8 };
+                    }
+                    return DEFAULT_WARD_STYLE;
+                };
+
+                if (wardsLayer) wardsLayer.setStyle(styleForFeature);
+                if (activeBtn?.dataset.key) {
+                    const categoryKey = activeBtn.dataset.key;
+                    const info = choroplethInfo[categoryKey];
+                    if (info) updateLegend(categoryKey, info.min, info.max); else updateLegend(null);
+                } else { updateLegend(null); }
+            };
+            
+            // --- EVENT LISTENERS ---
+            const setupEventListeners = () => {
+                searchInput.addEventListener('focus', handleNameSearch);
+                searchInput.addEventListener('keyup', (event) => {
+                    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) return;
+                    clearTimeout(searchDebounceTimer);
+                    searchDebounceTimer = setTimeout(handleNameSearch, 250);
+                });
+                searchInput.addEventListener('keydown', (event) => {
+                    if (searchResultsPanel.style.display !== 'block' || displayedSearchResults.length === 0) return;
+                    let newIndex;
+                    switch (event.key) {
+                        case 'ArrowDown': event.preventDefault(); newIndex = (currentFocusedResultIndex + 1) % displayedSearchResults.length; updateFocusedSearchResult(newIndex); break;
+                        case 'ArrowUp': event.preventDefault(); newIndex = (currentFocusedResultIndex - 1 + displayedSearchResults.length) % displayedSearchResults.length; updateFocusedSearchResult(newIndex); break;
+                        case 'Enter': event.preventDefault(); if (currentFocusedResultIndex !== -1) handleSearchResultClick(currentFocusedResultIndex); break;
+                        case 'Escape': searchResultsPanel.style.display = 'none'; updateFocusedSearchResult(-1); break;
+                    }
+                });
+                heatmapControls.addEventListener('click', e => {
+                    if (e.target.tagName === 'BUTTON') {
+                        heatmapControls.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                        e.target.classList.add('active');
+                        renderMapVisualization();
+                    }
+                });
+                document.addEventListener('click', (event) => {
+                    if (!searchContainer.contains(event.target) && !event.target.closest('.leaflet-popup-pane')) {
+                        searchResultsPanel.style.display = 'none';
+                        updateFocusedSearchResult(-1);
+                        if (!mapDomElement.contains(event.target)) { searchInput.value = ''; showResultOnMap(null); }
+                    }
+                });
+                map.on('click', () => {
+                    // Đóng popup nếu đang mở
+                    map.closePopup();
+
+                    // Reset lớp highlight
+                    showResultOnMap(null);
+                    currentSelectedWardId = null;
+
+                    // Ẩn panel tìm kiếm & clear input
+                    searchResultsPanel.style.display = 'none';
+                    searchInput.value = '';
+                    searchInput.blur();
+                    updateFocusedSearchResult(-1);
+                });
+                map.on('zoomend', updateTileLayer);
+            };
+            
+            // --- MAIN INITIALIZATION ---
+            const initializeApp = async () => {
+                setLoading(true);
+                await loadData();
+                if (!wardData?.features?.length) { setLoading(false); alert("Không có dữ liệu địa lý để hiển thị bản đồ."); return; }
+                // calculate custom padded bounds: 0.2 on sides/bottom, 0.5 on top
+                const rawBounds = L.geoJSON(wardData).getBounds();
+                const latDiff = rawBounds.getNorth() - rawBounds.getSouth();
+                const lngDiff = rawBounds.getEast() - rawBounds.getWest();
+                const dataBounds = L.latLngBounds(
+                    [
+                        rawBounds.getSouth() - latDiff * 0.2,  // bottom with 0.2
+                        rawBounds.getWest() - lngDiff * 0.2    // left with 0.2
+                    ],
+                    [
+                        rawBounds.getNorth() + latDiff * 0.5,  // top with 0.5
+                        rawBounds.getEast() + lngDiff * 0.2    // right with 0.2
+                    ]
+                );
+                map = L.map('map', { center: [10.78, 106.78], zoom: 9, attributionControl: false, zoomControl: false, maxBounds: dataBounds, maxBoundsViscosity: 1.0, minZoom: 9, maxZoom: 18 });
+                L.Icon.Default.imagePath = './assets/images/leaflet/';
+
+                // const logoControl = L.control({position: 'topleft'});
+                // logoControl.onAdd = function(map) {
+                //     const container = L.DomUtil.create('div', 'leaflet-logo-control');
+                //     container.innerHTML = '<a href="https://vnexpress.net" target="_blank" title="Về trang chủ VnExpress"><img src="./assets/images/qtsc_logo_transparent.png" alt="QTSC Logo" class="topbar-logo"></a>';
+                //     L.DomEvent.disableClickPropagation(container);
+                //     return container;
+                // };
+                // logoControl.addTo(map);
+
+                updateTileLayer();
+                createWardsLayer();
+                setupEventListeners();
+                addRankings();
+                prepareChoroplethData();
+                densityButton.classList.add('active');
+                renderMapVisualization();
+                setLoading(false);
+            };
+
+            initializeApp();
+        });
+    </script>
+</body>
+</html>
+
+        @media (max-width: 640px) {
+            #heatmap-controls button {
+                padding: 0.4rem 0.75rem;
+                font-size: 0.8rem;
+            }
+        }
