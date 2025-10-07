@@ -7,15 +7,15 @@ Kho lưu trữ GitHub gốc của dự án (đang được đồng bộ với th
 https://github.com/ducpt1012/spotlightvne
 
 ## Cấu trúc thư mục
-- `spotlightvne.github.io/HCMCmap/index.html`: Trang chính của ứng dụng.
-- `spotlightvne.github.io/HCMCmap/Data/`: Chứa các tệp dữ liệu `Wards.json`, `Districts.json`, `Provinces.json` và `Data.tsv`.
-- `spotlightvne.github.io/HCMCmap/assets/`: Chứa các thư viện và tài nguyên tĩnh đã được tải về (Tailwind, Leaflet, Font Awesome, hình ảnh, phông chữ...).
+- `HCMCmap/index.html`: Trang chính của ứng dụng.
+- `HCMCmap/Data/`: Chứa các tệp dữ liệu `Wards.json`, `Districts.json`, `Provinces.json` và `Data.tsv`.
+- `HCMCmap/assets/`: Chứa các thư viện và tài nguyên tĩnh đã được tải về (Tailwind, Leaflet, Font Awesome, hình ảnh, phông chữ...).
 
 ## Cách chạy trên máy cục bộ
-1. Mở terminal tại thư mục gốc của dự án (`/Users/duc.pt/raksul/map_sg`).
+1. Mở terminal tại thư mục gốc của repository.
 2. Chạy máy chủ tĩnh, ví dụ bằng Python:
    ```bash
-   cd spotlightvne.github.io/HCMCmap
+   cd HCMCmap
    python3 -m http.server 8080
    ```
 3. Mở trình duyệt tới địa chỉ `http://localhost:8080/index.html`.
