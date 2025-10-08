@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "demo": "./demo.sh",
     "install-deps": "npm install"
   },
   "keywords": ["map", "hcmc", "leaflet", "express"],
