@@ -127,4 +127,4 @@ open http://localhost:3000
 
 ---
 
-*🎯 Dự án được phát triển bởi [ducpt1012](https://github.com/ducpt1012) - Bản sao offline của [SpotlightVNE HCMC Map](https://spotlightvne.github.io/HCMCmap/)*
+*🎯 Bản sao offline của [SpotlightVNE HCMC Map](https://spotlightvne.github.io/HCMCmap/)*
