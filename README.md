@@ -12,6 +12,23 @@ https://github.com/ducpt1012/spotlightvne
 - `HCMCmap/assets/`: Chứa các thư viện và tài nguyên tĩnh đã được tải về (Tailwind, Leaflet, Font Awesome, hình ảnh, phông chữ...).
 
 ## Cách chạy trên máy cục bộ
+
+### Phương pháp 1: Sử dụng Node.js Server (Khuyến nghị)
+1. Cài đặt Node.js dependencies:
+   ```bash
+   npm install
+   ```
+2. Chạy server:
+   ```bash
+   npm start
+   ```
+   Hoặc để development với auto-reload:
+   ```bash
+   npm run dev
+   ```
+3. Mở trình duyệt tới địa chỉ `http://localhost:3000`.
+
+### Phương pháp 2: Sử dụng Python Server (Cũ)
 1. Mở terminal tại thư mục gốc của repository.
 2. Chạy máy chủ tĩnh, ví dụ bằng Python:
    ```bash
@@ -19,9 +36,26 @@ https://github.com/ducpt1012/spotlightvne
    python3 -m http.server 8080
    ```
 3. Mở trình duyệt tới địa chỉ `http://localhost:8080/index.html`.
+
+### Kiểm tra
 4. Kiểm tra bảng điều khiển (DevTools) để bảo đảm không còn lỗi tải dữ liệu.
+5. Truy cập API endpoints (chỉ với Node.js server):
+   - Health check: `http://localhost:3000/api/health`
+   - Data API: `http://localhost:3000/api/data/wards` (hoặc districts, provinces, data)
+
+## Node.js Server Features
+Server Node.js cung cấp:
+- ✅ Static file serving cho tất cả assets
+- ✅ RESTful API endpoints cho dữ liệu bản đồ
+- ✅ CORS support
+- ✅ Error handling
+- ✅ Health check endpoint
+- ✅ Development mode với auto-reload
+
+Chi tiết API documentation: [API_DOCS.md](./API_DOCS.md)
 
 ## Ghi chú
 - Khi máy không có Internet, lớp nền bản đồ (tile layer) sẽ tự động chuyển sang hình nền trống (`assets/images/blank-tile.png`). Nếu muốn hiển thị bản đồ nền ngoại tuyến, bạn cần tự chuẩn bị và cấu hình bộ tile offline phù hợp.
 - Cảnh báo màu vàng về `cdn.tailwindcss.com` chỉ nhắc rằng bản build CDN không phù hợp cho môi trường production; điều này không ảnh hưởng tới việc chạy thử offline.
 - Bạn có thể chỉnh sửa code và tải lại trang để xem thay đổi ngay lập tức.
+- Node.js server cung cấp API endpoints để truy xuất dữ liệu một cách có cấu trúc hơn so với Python server.
